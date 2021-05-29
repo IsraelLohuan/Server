@@ -16,11 +16,12 @@
 // -- Others --
 
 #define isnull(%1) ((!(%1[0])) || (((%1[0]) == '\1') && (!(%1[1]))))
- 
+
 enum p_Info {
 	p_LevelStaff,
 	p_Password[50],
-	Float:p_LastPosition[3]
+	p_ErrorLogin,
+	Float:p_LastPosition[3],
 }
 
 static const Float: randomSpawn[][] = {
@@ -59,11 +60,11 @@ public OnPlayerRequestClass(playerid, classid)
 public OnPlayerConnect(playerid)
 {
 	clearChat(playerid);
-	
+
 	SendClientMessage(playerid, -1, "{fcfcfc}| ZP | A Equipe {5085d9}ZonePerfect {fcfcfc}agradece sua preferencia!");
-	
+
 	verifyLogin(playerid);
-	
+
 	return 1;
 }
 
@@ -72,7 +73,7 @@ public OnPlayerDisconnect(playerid, reason)
 	desconectedPlayer(playerid);
 
 	DOF2_Exit();
-	
+
 	return 1;
 }
 
@@ -159,11 +160,11 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	            else
 	            {
 	                new message[195 + MAX_PLAYER_NAME];
-	                
+
 	                format(message, sizeof(message), "{fcfcfc}Parabens {32a852}%s, {fcfcfc}voce concluiu seu registro com sucesso e ja podera se divertir :)\n\n{cfd0d1}OBS: Guarde sua senha com cuidado, pois sera com ela que voce acessara sua conta!", getPlayerName(playerid));
-	                
+
 	                createAccount(playerid, inputtext);
-	                
+
 					ShowPlayerDialog(playerid, DIALOG_WELCOME, DIALOG_STYLE_MSGBOX, "Parabens", message, "Iniciar", "");
 	            }
 	        }
@@ -195,7 +196,18 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	            }
 	            else
 	            {
-	            	showDialogLogin(playerid, "Senha incorreta, favor tente novamente!");
+	            	new message[64];
+
+					playerInfo[playerid][p_ErrorLogin] ++;
+					
+					if(playerInfo[playerid][p_ErrorLogin] == 3)
+					{
+					    Kick(playerid);
+					}
+					
+					format(message, sizeof(message), "Senha incorreta, favor tente novamente!\n\nTentativas: %d de 3.", playerInfo[playerid][p_ErrorLogin]);
+					
+	            	showDialogLogin(playerid, message);
 	            }
 	        }
 	    }
@@ -210,7 +222,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 				else
 				{
 				    new itemSelected = strval(inputtext);
-				    
+
 				    switch(itemSelected)
 				    {
 				        case 1: spawnPlayerAfterLogin(playerid, true);
@@ -221,7 +233,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	        }
 	    }
 	}
-	
+
 	return 1;
 }
 
@@ -231,11 +243,11 @@ public OnPlayerClickPlayer(playerid, clickedplayerid, source)
 }
 
 // -- Functions --
-	
+
 getTotalPlayersOnline()
 {
 	new total = 0;
-	
+
 	for(new i = 0, last = GetMaxPlayers(); i < last; i ++)
 	{
 	    if(IsPlayerConnected(i))
@@ -243,25 +255,26 @@ getTotalPlayersOnline()
 	        total ++;
 	    }
 	}
-	
+
 	return total;
 }
 
 spawnPlayerAfterLogin(playerid, lastPosition = false)
 {
 	new messageAll[144];
-	
+
 	format(messageAll, sizeof(messageAll), "{cfd0d1}| SERVER | O(a) jogador(a) %s conectou-se ao servidor (%d/%d)", getPlayerName(playerid), getTotalPlayersOnline(), GetMaxPlayers());
-	
+
 	SendClientMessageToAll(-1, messageAll);
-	
+
     SendClientMessage(playerid, -1, "{fcfcfc}| LOGIN | Login realizado com sucesso!");
-    
+
     SpawnPlayer(playerid);
-    
+
     if(lastPosition)
     {
         SetPlayerPos(playerid, playerInfo[playerid][p_LastPosition][0], playerInfo[playerid][p_LastPosition][1], playerInfo[playerid][p_LastPosition][2]);
+        SetPlayerFacingAngle(playerid, 0);
     }
     else
     {
@@ -274,6 +287,8 @@ setPlayerRandomPos(playerid)
     new index = random(sizeof(randomSpawn));
 
     SetPlayerPos(playerid, randomSpawn[index][0], randomSpawn[index][1], randomSpawn[index][2]);
+    
+    SetPlayerFacingAngle(playerid, randomSpawn[index][3]);
 }
 
 loadingAccount(playerid)
@@ -284,7 +299,7 @@ loadingAccount(playerid)
 	playerInfo[playerid][p_LastPosition][0] = DOF2_GetFloat(getPlayerAccount(playerid), "last_position_x");
 	playerInfo[playerid][p_LastPosition][1] = DOF2_GetFloat(getPlayerAccount(playerid), "last_position_y");
 	playerInfo[playerid][p_LastPosition][2] = DOF2_GetFloat(getPlayerAccount(playerid), "last_position_z");
-	
+
 	GivePlayerMoney(playerid, DOF2_GetInt(getPlayerAccount(playerid), "money"));
 	SetPlayerScore(playerid, DOF2_GetInt(getPlayerAccount(playerid), "score"));
 }
@@ -292,14 +307,14 @@ loadingAccount(playerid)
 updatePlayerAccount(playerid)
 {
 	new Float:posPlayer[3];
-	
+
 	GetPlayerPos(playerid, posPlayer[0], posPlayer[1], posPlayer[2]);
-	
+
 	if(!DOF2_FileExists(getPlayerAccount(playerid)))
 	{
 		DOF2_CreateFile(getPlayerAccount(playerid));
 	}
-	
+
 	DOF2_SetInt(getPlayerAccount(playerid), "money", GetPlayerMoney(playerid));
 	DOF2_SetInt(getPlayerAccount(playerid), "score", GetPlayerScore(playerid));
 	DOF2_SetInt(getPlayerAccount(playerid), "level_staff", playerInfo[playerid][p_LevelStaff]);
@@ -317,9 +332,9 @@ createAccount(playerid, password[])
 	playerInfo[playerid][p_LastPosition][0] = randomSpawn[0][0];
 	playerInfo[playerid][p_LastPosition][1] = randomSpawn[0][0];
 	playerInfo[playerid][p_LastPosition][2] = randomSpawn[0][0];
-	
+
 	GivePlayerMoney(playerid, 500);
-	
+
 	updatePlayerAccount(playerid);
 }
 
@@ -329,6 +344,7 @@ resetPlayerData(playerid)
     playerInfo[playerid][p_LastPosition][0] = 0.0;
     playerInfo[playerid][p_LastPosition][1] = 0.0;
     playerInfo[playerid][p_LastPosition][2] = 0.0;
+    playerInfo[playerid][p_ErrorLogin] = 0;
 }
 
 desconectedPlayer(playerid)
