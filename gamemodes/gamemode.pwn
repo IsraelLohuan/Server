@@ -10,6 +10,7 @@
 #define DIALOG_REGISTER 	1
 #define DIALOG_WELCOME      2
 #define DIALOG_OPTION_SPAWN 3
+#define DIALOG_ADMINS       4
 
 // -- Defines Folders --
 
@@ -31,9 +32,10 @@ new __message[144];
 #define SendClientMessageToAllEx(%0,%1,%2)             \
         (format(__message,sizeof(__message),%1,%2),SendClientMessageToAll(%0,__message))
         
-#define COLOR_GREY 0xcfd0d1FF
-#define COLOR_RED  0xb52410FF
-#define COLOR_MAIN 0x799dc9FF
+#define COLOR_GREY    0xcfd0d1FF
+#define COLOR_RED  	  0xb52410FF
+#define COLOR_MAIN 	  0x799dc9FF
+#define COLOR_WARNING 0xe05f38FF
 
 #define MESSAGE_CMD_SUCESS  "| INFO | Comando executado com sucesso!"
 
@@ -490,7 +492,11 @@ CMD:a(playerid, params[])
 	if(isnull(params))
 	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /a [mensagem]");
 
-    sendMessageChatStaff(playerid, params);
+	new messageFormatted[144];
+	
+	format(messageFormatted, sizeof(messageFormatted), "| CHAT-STAFF | O(a) %s %s[%d] diz: %s", getOfficePlayer(playerid), getPlayerName(playerid), params);
+	
+    sendMessageStaff(messageFormatted);
     
 	return 1;
 }
@@ -1334,6 +1340,57 @@ CMD:destrancarserver(playerid)
 	return 1;
 }
 
+CMD:reportar(playerid, params[])
+{
+	if(isPlayerStaff(playerid))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Players!");
+
+	if(getTotalStaffOn() == 0)
+	    return SendClientMessage(playerid, COLOR_WARNING, "| AVISO | Nossa staff nao se encontra online, em caso urgente favor denuncie em nosso discord!");
+
+	new id, reason[30];
+	
+	if(sscanf(params, "ds[30]", id, reason))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /reportar [id] [motivo]");
+	    
+	if(strlen(reason) > 30)
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Motivo muito extenso, limite de caracteres: 30!");
+
+	new stringFormatted[144];
+	
+	format(stringFormatted, sizeof(stringFormatted), "| STAFF | O(a) jogador(a) %s[%d] reportou o(a) jogador(a) %s[%d], motivo: %s", getPlayerName(playerid), playerid, getPlayerName(id), id, reason);
+	
+    sendMessageStaff(stringFormatted, COLOR_WARNING);
+    
+	return 1;
+}
+
+CMD:admins(playerid)
+{
+	new stringFormatted[250], totalAdmins = 0;
+	
+	for(new i = 0, players = GetPlayerPoolSize(); i < players; i ++)
+	{
+	    if(isPlayerStaff(i))
+	    {
+	        totalAdmins ++;
+	        
+	        format(stringFormatted, sizeof(stringFormatted), "%s\n{cfd0d1}%s {fcfcfc}(Level Staff: {5be83f}%d{fcfcfc}) {fcfcfc}(Funcao: {5be83f}%s{fcfcfc})", stringFormatted, getPlayerName(i), playerInfo[i][p_LevelStaff], getOfficePlayer(i));
+	    }
+	}
+
+	if(!totalAdmins)
+	    return SendClientMessage(playerid, COLOR_WARNING, "| AVISO | Nossa staff nao se encontra online!");
+
+	new title[30];
+	
+	format(title, sizeof(title), "Administradores (%d)", totalAdmins);
+	
+	ShowPlayerDialog(playerid, DIALOG_ADMINS, DIALOG_STYLE_MSGBOX, title, stringFormatted, "Ok", "-");
+	
+	return 1;
+}
+
 // -- Callbacks --
 
 public messageRandom()
@@ -1344,6 +1401,21 @@ public messageRandom()
 }
 
 // -- Functions --
+
+getTotalStaffOn()
+{
+	new total = 0;
+	
+	for(new i = 0, players = GetPlayerPoolSize(); i <= players; i ++)
+	{
+	    if(IsPlayerConnected(i) && isPlayerStaff(i))
+	    {
+	        total ++;
+	    }
+	}
+	
+	return total;
+}
 
 destroyAllVehicles()
 {
@@ -1369,13 +1441,13 @@ destroyAllVehicles()
     }
 }
 
-sendMessageChatStaff(playerid, text[])
+sendMessageStaff(text[], color = COLOR_MAIN)
 {
 	for(new i = 0, players = GetPlayerPoolSize(); i < players; i ++)
 	{
 	    if(isPlayerStaff(i))
 	    {
-	        SendClientMessageEx(i, COLOR_MAIN, "| CHAT-STAFF | O(a) %s %s[%d] diz: %s", getOfficePlayer(playerid), getPlayerName(playerid), text);
+	        SendClientMessage(i, color, text);
 	    }
 	}
 }
