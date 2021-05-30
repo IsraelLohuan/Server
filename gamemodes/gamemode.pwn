@@ -44,6 +44,7 @@ enum p_Info {
 	p_Password[50],
 	p_ErrorLogin,
 	p_Notice,
+	bool:p_isVotedInSurvey,
 	bool:p_invisible,
 	bool:p_ShutUp,
 	bool:p_Frozen,
@@ -55,6 +56,13 @@ enum s_Info {
 	s_TimerMessages,
 	bool:s_Locked,
 	bool:s_AllFrozen
+}
+
+enum s_Survey {
+	s_Title[128],
+	s_VoteYes,
+	s_VoteNo,
+	bool:s_Created
 }
 
 enum {
@@ -107,6 +115,9 @@ new playerInfo[MAX_PLAYERS][p_Info];
 
 new server[s_Info];
 
+new survey[s_Survey];
+
+forward closedSurvey();
 forward messageRandom();
 
 main()
@@ -904,6 +915,29 @@ CMD:textoprivado(playerid, params[])
 	return 1;
 }
 
+CMD:enquete(playerid, params[])
+{
+    if(!isPlayerOffice(playerid, MODERATOR))
+		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Moderadores!");
+
+	if(isnull(params))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /enquete [descricao]");
+	    
+	if(survey[s_Created])
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Ja possui uma enquete aberta, aguarde ser finalizada!");
+	    
+	survey[s_Created] = true;
+	
+	format(survey[s_Title], sizeof(survey[s_Title]), "%s", params);
+	
+	SendClientMessageToAllEx(COLOR_MAIN, "| INFO | O %s %s abriu uma enquete: %s. Digite [/sim] ou [/nao] para participar", getOfficePlayer(playerid), getPlayerName(playerid), params);
+	SendClientMessageToAll(COLOR_MAIN, "| INFO | A enquete fechara em 50 segundos!");
+	
+	SetTimer("closedSurvey", Seconds(50), false);
+	
+	return 1;
+}
+
 CMD:setarskin(playerid, params[])
 {
 	if(!isPlayerOffice(playerid, COORDINATOR))
@@ -1391,7 +1425,62 @@ CMD:admins(playerid)
 	return 1;
 }
 
+CMD:sim(playerid)
+{
+	if(!survey[s_Created])
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Nao ha enquete criada!");
+	    
+	if(playerInfo[playerid][p_isVotedInSurvey])
+		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce ja votou na enquete, aguarde o resultado!");
+
+	survey[s_VoteYes] ++;
+	
+	SendClientMessage(playerid, COLOR_GREY, "| INFO | Seu voto foi computado com sucesso, aguarde o termino da enquete!");
+	
+	return 1;
+}
+
+CMD:nao(playerid)
+{
+	if(!survey[s_Created])
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Nao ha enquete criada!");
+
+    if(playerInfo[playerid][p_isVotedInSurvey])
+		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce ja votou na enquete, aguarde o resultado!");
+
+	survey[s_VoteNo] ++;
+
+	SendClientMessage(playerid, COLOR_GREY, "| INFO | Seu voto foi computado com sucesso, aguarde o termino da enquete!");
+
+	return 1;
+}
+
 // -- Callbacks --
+
+public closedSurvey()
+{
+	survey[s_Created] = false;
+	
+	survey[s_Title] = EOS;
+	
+	SendClientMessageToAll(-1, "{cfd0d1}| ENQUETE | {fcfcfc}A enquete foi encerrada, veja abaixo os resultados!");
+	
+	SendClientMessageToAllEx(-1, "{cfd0d1}| ENQUETE | {fcfcfc}Votos {5be83f}Sim {fcfcfc}({cfd0d1}%d{fcfcfc}) | Votos {b52410}Nao {fcfcfc}({cfd0d1}%d{fcfcfc})", survey[s_VoteYes], survey[s_VoteNo]);
+	
+	if(survey[s_VoteYes] > survey[s_VoteNo])
+	{
+	    SendClientMessageToAll(-1, "{cfd0d1}| ENQUETE | O {5be83f}SIM {fcfcfc}teve maior voto!");
+	}
+	else
+	{
+	    SendClientMessageToAll(-1, "{cfd0d1}| ENQUETE | O {5be83f}NAO {fcfcfc}teve maior voto!");
+	}
+	
+	for(new i = 0, players = GetPlayerPoolSize(); i <= players; i ++)
+	{
+	    playerInfo[i][p_isVotedInSurvey] = false;
+	}
+}
 
 public messageRandom()
 {
@@ -1571,6 +1660,7 @@ resetPlayerData(playerid)
     playerInfo[playerid][p_LastPosition][2] = 0.0;
     playerInfo[playerid][p_ErrorLogin] = 0;
     playerInfo[playerid][p_Notice] = 0;
+    playerInfo[playerid][p_isVotedInSurvey] = false;
     playerInfo[playerid][p_invisible] = false;
     playerInfo[playerid][p_ShutUp] = false;
     playerInfo[playerid][p_Frozen] = false;
