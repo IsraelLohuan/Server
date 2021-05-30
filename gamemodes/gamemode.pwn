@@ -11,6 +11,7 @@
 #define DIALOG_WELCOME      2
 #define DIALOG_OPTION_SPAWN 3
 #define DIALOG_ADMINS       4
+#define DIALOG_BANS         5
 
 // -- Defines Folders --
 
@@ -40,6 +41,9 @@ new __message[144];
 #define COLOR_WARNING 0xe05f38FF
 
 #define MESSAGE_CMD_SUCESS  "| INFO | Comando executado com sucesso!"
+
+#define BAN_ACCOUNT  1
+#define BAN_IP       2
 
 enum p_Info {
 	p_LevelStaff,
@@ -300,7 +304,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	            {
 	                showDialogRegister(playerid, "Necessario preencher o campo de senha!");
 	            }
-	            else if(!strcmp(DOF2_GetString(getPlayerAccount(playerid), "password"), inputtext))
+	            else if(!strcmp(DOF2_GetString(getFolder(playerid, FOLDER_ACCOUNT), "password"), inputtext))
 	            {
 					loadingAccount(playerid);
 
@@ -948,6 +952,74 @@ CMD:enquete(playerid, params[])
 	return 1;
 }
 
+CMD:banir(playerid, params[])
+{
+    if(!isPlayerOffice(playerid, MODERATOR))
+		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Moderadores!");
+
+	new id, typeBan[10], reason[30];
+	
+	if(sscanf(params, "ds[10]s[30]", id, typeBan, reason))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /banir [tipo do ban: conta ou ip] [motivo]");
+	    
+	if(strlen(reason) > 30)
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Motivo muito extenso!");
+	    
+	if(isPlayerStaff(id))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce nao pode usar este comando com um staff!");
+	    
+	if(!IsPlayerConnected(id))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Jogador(a) nao conectado!");
+
+	if(strcmp(typeBan, "conta") == 0)
+	{
+	   	ban(playerid, reason, id, BAN_ACCOUNT);
+	}
+	else if(strcmp(typeBan, "ip") == 0)
+	{
+ 		ban(playerid, reason, id, BAN_IP);
+	}
+	else
+	{
+	    SendClientMessage(playerid, COLOR_RED, "| ERRO | Tipo de banimento invalido, tipos validos: [conta/ip]");
+	    
+	    return 1;
+	}
+	
+	SendClientMessageToAllEx(COLOR_WARNING, "| ADMIN | O %s %s baniu o(a) jogador(a) %s, motivo: %s", getOfficePlayer(playerid), getPlayerName(playerid), getPlayerName(id), reason);
+	
+	return 1;
+}
+
+CMD:desbanir(playerid, params[])
+{
+    if(!isPlayerOffice(playerid, MODERATOR))
+		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Moderadores!");
+
+	new typeBan[10], data[MAX_PLAYER_NAME];
+
+	if(sscanf(params, "s[10]s[24]", typeBan, data))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /banir [tipo do ban: conta ou ip] [nome da conta ou ip]");
+
+	new result;
+	
+	if(strcmp(typeBan, "conta") == 0)
+	{
+	   	result = desban(data, BAN_ACCOUNT);
+	}
+	else if(strcmp(typeBan, "ip") == 0)
+	{
+ 		result = desban(data, BAN_IP);
+	}
+	
+	if(result == -1)
+		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Esta conta ou ip nao esta banida!");
+		
+	SendClientMessage(playerid, COLOR_WARNING, "| ADMIN | Conta desbanida com sucesso!");
+	
+	return 1;
+}
+
 CMD:setarskin(playerid, params[])
 {
 	if(!isPlayerOffice(playerid, COORDINATOR))
@@ -996,11 +1068,11 @@ CMD:setarnome(playerid, params[])
 	    
 	new folderOld[MAX_PLAYER_NAME + 13];
 	
-	format(folderOld, sizeof(folderOld), "%s", getPlayerAccount(playerid));
+	format(folderOld, sizeof(folderOld), "%s", getFolder(playerid, FOLDER_ACCOUNT));
 	
 	SetPlayerName(id, name);
 	
-	DOF2_RenameFile(folderOld, getPlayerAccount(playerid));
+	DOF2_RenameFile(folderOld, getFolder(playerid, FOLDER_ACCOUNT));
 	
 	return 1;
 }
@@ -1702,16 +1774,16 @@ setPlayerRandomPos(playerid)
 
 loadingAccount(playerid)
 {
-    format(playerInfo[playerid][p_Password], 50, "%s", DOF2_GetString(getPlayerAccount(playerid), "password"));
+    format(playerInfo[playerid][p_Password], 50, "%s", DOF2_GetString(getFolder(playerid, FOLDER_ACCOUNT), "password"));
 
-	playerInfo[playerid][p_LevelStaff] = DOF2_GetInt(getPlayerAccount(playerid), "level_staff");
-	playerInfo[playerid][p_LastPosition][0] = DOF2_GetFloat(getPlayerAccount(playerid), "last_position_x");
-	playerInfo[playerid][p_LastPosition][1] = DOF2_GetFloat(getPlayerAccount(playerid), "last_position_y");
-	playerInfo[playerid][p_LastPosition][2] = DOF2_GetFloat(getPlayerAccount(playerid), "last_position_z");
+	playerInfo[playerid][p_LevelStaff] = DOF2_GetInt(getFolder(playerid, FOLDER_ACCOUNT), "level_staff");
+	playerInfo[playerid][p_LastPosition][0] = DOF2_GetFloat(getFolder(playerid, FOLDER_ACCOUNT), "last_position_x");
+	playerInfo[playerid][p_LastPosition][1] = DOF2_GetFloat(getFolder(playerid, FOLDER_ACCOUNT), "last_position_y");
+	playerInfo[playerid][p_LastPosition][2] = DOF2_GetFloat(getFolder(playerid, FOLDER_ACCOUNT), "last_position_z");
 
-	GivePlayerMoney(playerid, DOF2_GetInt(getPlayerAccount(playerid), "money"));
-	SetPlayerScore(playerid, DOF2_GetInt(getPlayerAccount(playerid), "score"));
-	SetPlayerSkin(playerid, DOF2_GetInt(getPlayerAccount(playerid), "skin"));
+	GivePlayerMoney(playerid, DOF2_GetInt(getFolder(playerid, FOLDER_ACCOUNT), "money"));
+	SetPlayerScore(playerid, DOF2_GetInt(getFolder(playerid, FOLDER_ACCOUNT), "score"));
+	SetPlayerSkin(playerid, DOF2_GetInt(getFolder(playerid, FOLDER_ACCOUNT), "skin"));
 }
 
 updatePlayerAccount(playerid)
@@ -1720,19 +1792,19 @@ updatePlayerAccount(playerid)
 
 	GetPlayerPos(playerid, posPlayer[0], posPlayer[1], posPlayer[2]);
 
-	if(!DOF2_FileExists(getPlayerAccount(playerid)))
+	if(!DOF2_FileExists(getFolder(playerid, FOLDER_ACCOUNT)))
 	{
-		DOF2_CreateFile(getPlayerAccount(playerid));
+		DOF2_CreateFile(getFolder(playerid, FOLDER_ACCOUNT));
 	}
 
-	DOF2_SetInt(getPlayerAccount(playerid), "skin", GetPlayerSkin(playerid));
-	DOF2_SetInt(getPlayerAccount(playerid), "money", GetPlayerMoney(playerid));
-	DOF2_SetInt(getPlayerAccount(playerid), "score", GetPlayerScore(playerid));
-	DOF2_SetInt(getPlayerAccount(playerid), "level_staff", playerInfo[playerid][p_LevelStaff]);
-	DOF2_SetString(getPlayerAccount(playerid), "password", playerInfo[playerid][p_Password]);
-	DOF2_SetFloat(getPlayerAccount(playerid), "last_position_x", posPlayer[0]);
-	DOF2_SetFloat(getPlayerAccount(playerid), "last_position_y", posPlayer[1]);
-	DOF2_SetFloat(getPlayerAccount(playerid), "last_position_z", posPlayer[2]);
+	DOF2_SetInt(getFolder(playerid, FOLDER_ACCOUNT), "skin", GetPlayerSkin(playerid));
+	DOF2_SetInt(getFolder(playerid, FOLDER_ACCOUNT), "money", GetPlayerMoney(playerid));
+	DOF2_SetInt(getFolder(playerid, FOLDER_ACCOUNT), "score", GetPlayerScore(playerid));
+	DOF2_SetInt(getFolder(playerid, FOLDER_ACCOUNT), "level_staff", playerInfo[playerid][p_LevelStaff]);
+	DOF2_SetString(getFolder(playerid, FOLDER_ACCOUNT), "password", playerInfo[playerid][p_Password]);
+	DOF2_SetFloat(getFolder(playerid, FOLDER_ACCOUNT), "last_position_x", posPlayer[0]);
+	DOF2_SetFloat(getFolder(playerid, FOLDER_ACCOUNT), "last_position_y", posPlayer[1]);
+	DOF2_SetFloat(getFolder(playerid, FOLDER_ACCOUNT), "last_position_z", posPlayer[2]);
 }
 
 createAccount(playerid, password[])
@@ -1770,6 +1842,72 @@ desconectedPlayer(playerid)
 	resetPlayerData(playerid);
 }
 
+ban(idStaff, reason[], playerid, typeBan = BAN_ACCOUNT)
+{
+	new folder[30], day[3], hour[3];
+	
+	getdate(day[0], day[1], day[2]);
+	gettime(hour[0], hour[1], hour[2]);
+		
+	if(typeBan == BAN_ACCOUNT)
+	{
+	    format(folder, sizeof(folder), "%s", getFolder(playerid, FOLDER_BANS));
+	}
+	else
+	{
+	    format(folder, sizeof(folder), "%s", getFolder(playerid, FOLDER_BANS_IP));
+	}
+	
+	DOF2_CreateFile(folder);
+
+	DOF2_SetString(folder, "staff", getPlayerName(idStaff));
+	DOF2_SetString(folder, "reason", reason);
+	DOF2_SetInt(folder, "year", day[0]);
+	DOF2_SetInt(folder, "month", day[1]);
+	DOF2_SetInt(folder, "day", day[2]);
+	DOF2_SetInt(folder, "hour", hour[0]);
+	DOF2_SetInt(folder, "minute", hour[1]);
+	DOF2_SetInt(folder, "seconds", hour[2]);
+
+	Kick(playerid);
+	
+	return 1;
+}
+
+desban(data[], typeBan = BAN_ACCOUNT)
+{
+	new folder[30];
+	
+	if(typeBan == BAN_ACCOUNT)
+	{
+	    format(folder, sizeof(folder), FOLDER_BANS, data);
+	}
+	else
+	{
+	    format(folder, sizeof(folder), FOLDER_BANS_IP, data);
+	}
+	
+ 	if(!DOF2_FileExists(folder))
+	{
+ 		return -1;
+	}
+	else
+	{
+ 		DOF2_RemoveFile(folder);
+	}
+	
+	return 1;
+}
+
+getPlayerIp(playerid)
+{
+	static ip[16];
+
+	GetPlayerIp(playerid, ip, sizeof(ip));
+	
+	return ip;
+}
+
 getPlayerName(playerid)
 {
 	static name[MAX_PLAYER_NAME];
@@ -1779,12 +1917,20 @@ getPlayerName(playerid)
 	return name;
 }
 
-getPlayerAccount(playerid)
+getFolder(playerid, folder[])
 {
-	static stringFormatted[MAX_PLAYER_NAME + 13];
+	new stringFormatted[30];
+	
+	if(strcmp(folder, FOLDER_BANS_IP) == 0)
+	{
+	    format(stringFormatted, sizeof(stringFormatted), folder, getPlayerIp(playerid));
+	}
 
-	format(stringFormatted, sizeof(stringFormatted), FOLDER_ACCOUNT, getPlayerName(playerid));
-
+	else
+	{
+		format(stringFormatted, sizeof(stringFormatted), folder, getPlayerName(playerid));
+	}
+	    
 	return stringFormatted;
 }
 
@@ -1847,15 +1993,89 @@ showDialogLogin(playerid, error[] = "")
 	ShowPlayerDialog(playerid, DIALOG_LOGIN, DIALOG_STYLE_INPUT, "Login", messageDialog, "Login", "Sair");
 }
 
+getDateFormatted(day, month, year)
+{
+	new dateFormatted[30];
+	
+	format(dateFormatted, sizeof(dateFormatted), "%d/%d/%d", day, month, year);
+	
+	return dateFormatted;
+}
+
+getHourFormatted(hour, minute, seconds)
+{
+	new hourFormatted[30];
+	
+	format(hourFormatted, sizeof(hourFormatted), "%d:%d:%d", hour, minute, seconds);
+	
+	return hourFormatted;
+}
+
+showDetailsBan(playerid, typeBan, folder[])
+{
+	new messageFormatted[400], staff[MAX_PLAYER_NAME], reason[30], day, month, year, hour, minute, seconds;
+
+	format(staff, sizeof(staff), "%s", DOF2_GetString(folder, "staff"));
+	format(reason, sizeof(reason), "%s", DOF2_GetString(folder, "reason"));
+
+	day   = DOF2_GetInt(folder, "day");
+ 	month = DOF2_GetInt(folder, "month");
+	year  = DOF2_GetInt(folder, "year");
+
+	hour    = DOF2_GetInt(folder, "hour");
+	minute  = DOF2_GetInt(folder, "minute");
+	seconds = DOF2_GetInt(folder, "seconds");
+
+	switch(typeBan)
+	{
+	    case BAN_ACCOUNT: format(messageFormatted, sizeof(messageFormatted), "{fcfcfc}Olá {32a852}%s {fcfcfc}sua conta se encontra {b52410}banida {fcfcfc}de nosso servidor, veja abaixo os detalhes do banimento!\n\nStaff Responsavel: {cfd0d1}%s\n{fcfcfc}Motivo: {cfd0d1}%s\n{fcfcfc}Data: {cfd0d1}%s\n{fcfcfc}Horario: {cfd0d1}%s\n{fcfcfc}Acha seu banimento injusto? exponha o caso em nosso discord.", staff, reason, getDateFormatted(day, month, year), getHourFormatted(hour, minute, seconds));
+		case BAN_IP: format(messageFormatted, sizeof(messageFormatted), "{fcfcfc}Olá %s {fcfcfc}seu ip se encontra {b52410}banido {fcfcfc}de nosso servidor, veja abaixo os detalhes do banimento!\n\nStaff Responsavel: {cfd0d1}%s\n{fcfcfc}Motivo: {cfd0d1}%s\n{fcfcfc}Data: {cfd0d1}%s\n{fcfcfc}Horario: {cfd0d1}%s\n{fcfcfc}Acha seu banimento injusto? exponha o caso em nosso discord.", staff, reason, getDateFormatted(day, month, year), getHourFormatted(hour, minute, seconds));
+	}
+	
+	ShowPlayerDialog(playerid, DIALOG_BANS, DIALOG_STYLE_MSGBOX, "Conta Banida", messageFormatted, "Ok", "-");
+	
+	Kick(playerid);
+}
+
+verifyTypeBanned(playerid, folder_Ban[])
+{
+	format(folder_Ban, 30, "%s", getFolder(playerid, FOLDER_BANS));
+	
+	if(DOF2_FileExists(folder_Ban))
+	{
+	   	return BAN_ACCOUNT;
+	}
+	
+	format(folder_Ban, 30, "%s", getFolder(playerid, FOLDER_BANS_IP));
+	
+	if(DOF2_FileExists(folder_Ban))
+	{
+	    return BAN_IP;
+	}
+	
+	return -1;
+}
+
 verifyLogin(playerid)
 {
-	if(DOF2_FileExists(getPlayerAccount(playerid)))
+	new typeBanned, folder[30];
+	
+	typeBanned = verifyTypeBanned(playerid, folder);
+	
+	if(typeBanned == -1)
 	{
-	    showDialogLogin(playerid);
+		if(DOF2_FileExists(getFolder(playerid, FOLDER_ACCOUNT)))
+		{
+		    showDialogLogin(playerid);
+		}
+		else
+		{
+		    showDialogRegister(playerid);
+		}
 	}
 	else
 	{
-	    showDialogRegister(playerid);
+	    showDetailsBan(playerid, typeBanned, folder);
 	}
 }
 
