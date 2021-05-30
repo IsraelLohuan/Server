@@ -39,6 +39,7 @@ new __message[144];
 #define COLOR_RED  	  0xb52410FF
 #define COLOR_MAIN 	  0x799dc9FF
 #define COLOR_WARNING 0xe05f38FF
+#define COLOR_GREEN   0x48d948FF
 
 #define MESSAGE_CMD_SUCESS  "| INFO | Comando executado com sucesso!"
 
@@ -50,6 +51,8 @@ enum p_Info {
 	p_Password[50],
 	p_ErrorLogin,
 	p_Notice,
+	p_JailedTimer,
+	p_JailedTime,
 	bool:p_isVotedInSurvey,
 	bool:p_invisible,
 	bool:p_ShutUp,
@@ -123,6 +126,7 @@ new server[s_Info];
 
 new survey[s_Survey];
 
+forward verifyJailed(playerid);
 forward closedSurvey();
 forward messageRandom();
 
@@ -308,7 +312,16 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 	            {
 					loadingAccount(playerid);
 
-					ShowPlayerDialog(playerid, DIALOG_OPTION_SPAWN, DIALOG_STYLE_INPUT, "Escolha seu Spawn", "{799dc9}1. {fcfcfc}Voltar para ultima posicao que estava\n\n{799dc9}2. {fcfcfc}Spawn aleatorio", "Escolher", "-");
+					if(isPlayerJailed(playerid))
+					{
+					    SendClientMessageToAllEx(COLOR_WARNING, "| CADEIA | Voce ainda nao cumpriu sua pena! tempo restante: %s", convertTimer(playerInfo[playerid][p_JailedTime]));
+
+						setPlayerJailed(playerid, playerInfo[playerid][p_JailedTime]);
+					}
+					else
+					{
+					    ShowPlayerDialog(playerid, DIALOG_OPTION_SPAWN, DIALOG_STYLE_INPUT, "Escolha seu Spawn", "{799dc9}1. {fcfcfc}Voltar para ultima posicao que estava\n\n{799dc9}2. {fcfcfc}Spawn aleatorio", "Escolher", "-");
+					}
 	            }
 	            else
 	            {
@@ -1020,6 +1033,60 @@ CMD:desbanir(playerid, params[])
 	return 1;
 }
 
+CMD:prender(playerid, params[])
+{
+    if(!isPlayerOffice(playerid, MODERATOR))
+		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Moderadores!");
+
+	new id, reason[30], time;
+	
+	if(sscanf(params, "ds[30]d", id, reason, time))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /prender [id] [motivo] [tempo]");
+	    
+	if(!IsPlayerConnected(id))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Jogador(a) nao conectado!");
+
+	if(isPlayerStaff(id))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce nao pode usar este comando com um staff!");
+
+	if(strlen(reason) > 30)
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Motivo muito extenso!");
+	    
+	if(isPlayerJailed(playerid))
+	     return SendClientMessage(playerid, COLOR_RED, "| ERRO | Este player ja se encontra preso!");
+
+	SendClientMessageToAllEx(COLOR_WARNING, "| CADEIA | O %s %s prendeu o jogador %s, motivo: %s, tempo: %s", getOfficePlayer(playerid), getPlayerName(playerid), getPlayerName(id), reason, convertTimer(time));
+	
+	SendClientMessage(id, COLOR_GREEN, "| CADEIA | para ver o tempo restante digite: /cadeiatempo");
+	
+	setPlayerJailed(playerid, time);
+	
+	return 1;
+}
+
+CMD:soltar(playerid, params[])
+{
+	if(!isPlayerOffice(playerid, MODERATOR))
+		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Moderadores!");
+
+	if(isnull(params))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /soltar [id]");
+
+	new id = strval(params);
+	
+	if(!IsPlayerConnected(id))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Jogador(a) nao conectado!");
+
+	if(!isPlayerJailed(playerid))
+	     return SendClientMessage(playerid, COLOR_RED, "| ERRO | Este player nao esta preso!");
+
+    SendClientMessageToAllEx(COLOR_WARNING, "| CADEIA | O %s %s removeu o jogador %s da prisao!", getOfficePlayer(playerid), getPlayerName(playerid), getPlayerName(id));
+
+    removePlayerFromJailed(id);
+    
+	return 1;
+}
+
 CMD:setarskin(playerid, params[])
 {
 	if(!isPlayerOffice(playerid, COORDINATOR))
@@ -1130,7 +1197,7 @@ CMD:setarpos(playerid, params[])
 	SetPlayerPos(id, posSelected[0], posSelected[1], posSelected[2]);
 	
 	SendClientMessageEx(playerid, COLOR_GREY, "| INFO | Voce levou o player %s para as coordenadas %d %d %d", getPlayerName(id), posSelected[0], posSelected[1], posSelected[2]);
-	SendClientMessageEx(id, COLOR_GREY, "| INFO | O %s %s levou alterou suas coordenadas", getOfficePlayer(playerid), getPlayerName(playerid));
+	SendClientMessageEx(id, COLOR_GREY, "| INFO | O %s %s alterou suas coordenadas", getOfficePlayer(playerid), getPlayerName(playerid));
 	
 	return 1;
 }
@@ -1624,7 +1691,29 @@ CMD:nao(playerid)
 	return 1;
 }
 
+CMD:cadeiatempo(playerid)
+{
+	if(!isPlayerJailed(playerid))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce nao esta preso!");
+
+	SendClientMessageEx(playerid, COLOR_GREEN, "| CADEIA | Tempo restante %s", convertTimer(playerInfo[playerid][p_JailedTime]));
+	
+	return 1;
+}
+
 // -- Callbacks --
+
+public verifyJailed(playerid)
+{
+    playerInfo[playerid][p_JailedTime] --;
+    
+	if(playerInfo[playerid][p_JailedTime] <= 0)
+	{
+	   removePlayerFromJailed(playerid);
+	}
+	
+	return 1;
+}
 
 public closedSurvey()
 {
@@ -1780,7 +1869,8 @@ loadingAccount(playerid)
 	playerInfo[playerid][p_LastPosition][0] = DOF2_GetFloat(getFolder(playerid, FOLDER_ACCOUNT), "last_position_x");
 	playerInfo[playerid][p_LastPosition][1] = DOF2_GetFloat(getFolder(playerid, FOLDER_ACCOUNT), "last_position_y");
 	playerInfo[playerid][p_LastPosition][2] = DOF2_GetFloat(getFolder(playerid, FOLDER_ACCOUNT), "last_position_z");
-
+	playerInfo[playerid][p_JailedTime] = DOF2_GetInt(getFolder(playerid, FOLDER_ACCOUNT), "time_jailed");
+	
 	GivePlayerMoney(playerid, DOF2_GetInt(getFolder(playerid, FOLDER_ACCOUNT), "money"));
 	SetPlayerScore(playerid, DOF2_GetInt(getFolder(playerid, FOLDER_ACCOUNT), "score"));
 	SetPlayerSkin(playerid, DOF2_GetInt(getFolder(playerid, FOLDER_ACCOUNT), "skin"));
@@ -1801,6 +1891,7 @@ updatePlayerAccount(playerid)
 	DOF2_SetInt(getFolder(playerid, FOLDER_ACCOUNT), "money", GetPlayerMoney(playerid));
 	DOF2_SetInt(getFolder(playerid, FOLDER_ACCOUNT), "score", GetPlayerScore(playerid));
 	DOF2_SetInt(getFolder(playerid, FOLDER_ACCOUNT), "level_staff", playerInfo[playerid][p_LevelStaff]);
+	DOF2_SetInt(getFolder(playerid, FOLDER_ACCOUNT), "time_jailed", playerInfo[playerid][p_JailedTime]);
 	DOF2_SetString(getFolder(playerid, FOLDER_ACCOUNT), "password", playerInfo[playerid][p_Password]);
 	DOF2_SetFloat(getFolder(playerid, FOLDER_ACCOUNT), "last_position_x", posPlayer[0]);
 	DOF2_SetFloat(getFolder(playerid, FOLDER_ACCOUNT), "last_position_y", posPlayer[1]);
@@ -1829,17 +1920,47 @@ resetPlayerData(playerid)
     playerInfo[playerid][p_LastPosition][2] = 0.0;
     playerInfo[playerid][p_ErrorLogin] = 0;
     playerInfo[playerid][p_Notice] = 0;
+    playerInfo[playerid][p_JailedTime] = 0;
     playerInfo[playerid][p_isVotedInSurvey] = false;
     playerInfo[playerid][p_invisible] = false;
     playerInfo[playerid][p_ShutUp] = false;
     playerInfo[playerid][p_Frozen] = false;
     playerInfo[playerid][p_Spectating] = false;
+    
+    KillTimer(playerInfo[playerid][p_JailedTimer]);
 }
 
 desconectedPlayer(playerid)
 {
     updatePlayerAccount(playerid);
 	resetPlayerData(playerid);
+}
+
+setPlayerJailed(playerid, time)
+{
+	SpawnPlayer(playerid);
+	
+	SetPlayerPos(playerid, 264.6288, 77.5742, 1001.0391);
+	
+    SetPlayerInterior(playerid, 6);
+    
+    playerInfo[playerid][p_JailedTime] = time;
+    playerInfo[playerid][p_JailedTimer] = SetTimerEx("verifyJailed", Seconds(1), true, "i", playerid);
+}
+
+removePlayerFromJailed(playerid)
+{
+	setPlayerRandomPos(playerid);
+	
+	SendClientMessage(playerid, COLOR_GREEN, "| CADEIA | Voce cumpriu sua pena e esta livre novamente!");
+
+	playerInfo[playerid][p_JailedTime] = 0;
+	KillTimer(playerInfo[playerid][p_JailedTimer]);
+}
+
+isPlayerJailed(playerid)
+{
+	return playerInfo[playerid][p_JailedTime] > 0;
 }
 
 ban(idStaff, reason[], playerid, typeBan = BAN_ACCOUNT)
@@ -2077,5 +2198,34 @@ verifyLogin(playerid)
 	{
 	    showDetailsBan(playerid, typeBanned, folder);
 	}
+}
+
+convertTimer(number)
+{
+    new timer[5], formatted[75];
+
+    timer[4] = number - gettime();
+    timer[0] = timer[4] / 3600;
+    timer[1] = ((timer[4] / 60) - (timer[0] * 60));
+    timer[2] = (timer[4] - ((timer[0] * 3600) + (timer[1] * 60)));
+    timer[3] = (timer[0]/24);
+
+    if(timer[3] > 0)
+    {
+        timer[0] = timer[0] % 24,
+        format(formatted, sizeof(formatted), "%ddias, %02dh %02dm e %02ds", timer[3], timer[0], timer[1], timer[2]);
+    }
+        
+    else if(timer[0] > 0)
+    {
+        format(formatted, sizeof(formatted), "%02dh %02dm e %02ds", timer[0], timer[1], timer[2]);
+    }
+        
+    else
+    {
+        format(formatted, sizeof(formatted), "%02dm e %02ds", timer[1], timer[2]);
+    }
+        
+    return formatted;
 }
 
