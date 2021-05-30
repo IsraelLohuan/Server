@@ -17,7 +17,7 @@
 
 #define FOLDER_ACCOUNT      "Contas/%s.ini"
 #define FOLDER_BANS         "Bans/%s.ini"
-#define FOLDER_BANS_IP      "Bans/%s.ini"
+#define FOLDER_BANS_IP      "BansIp/%s.ini"
 
 // -- Others --
 
@@ -1516,7 +1516,7 @@ CMD:nomelinguagem(playerid, params[])
 
 CMD:daradmin(playerid, params[])
 {
-    if(!isPlayerOffice(playerid, FOUNDER))
+    if(!IsPlayerAdmin(playerid))
 		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Fundador!");
 
 	new id, level;
