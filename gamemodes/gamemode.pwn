@@ -15,6 +15,8 @@
 // -- Defines Folders --
 
 #define FOLDER_ACCOUNT      "Contas/%s.ini"
+#define FOLDER_BANS         "Bans/%s.ini"
+#define FOLDER_BANS_IP      "Bans/%s.ini"
 
 // -- Others --
 
@@ -145,6 +147,14 @@ public OnGameModeExit()
 
 public OnPlayerRequestClass(playerid, classid)
 {
+    SetPlayerPos(playerid, 2620.7007, 1717.2212, 11.0234);
+    
+	SetPlayerFacingAngle(playerid, 89.0025);
+	
+	SetPlayerCameraPos(playerid, 2616.5374, 1716.9574, 10.8203);
+	
+	SetPlayerCameraLookAt(playerid, 2616.5374, 1716.9574, 10.8203);
+	
 	return 1;
 }
 
@@ -1065,6 +1075,93 @@ CMD:verpos(playerid)
     SendClientMessageEx(playerid, COLOR_GREY, "| INFO | Voce esta na posicao %f %f %f", pos[0], pos[1], pos[2]);
     
     return 1;
+}
+
+CMD:force(playerid, params[])
+{
+	if(!isPlayerOffice(playerid, COORDINATOR))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Coordenador!");
+	    
+	if(isnull(params))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /force [id]");
+	    
+	new id = strval(params);
+	
+	if(!IsPlayerConnected(id))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Jogador(a) nao conectado!");
+
+	if(isPlayerStaff(id))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce nao pode usar este comando com um staff!");
+
+    ForceClassSelection(id);
+    
+	TogglePlayerSpectating(id, true);
+    TogglePlayerSpectating(id, false);
+    
+	return 1;
+}
+
+CMD:fakechat(playerid, params[])
+{
+	if(!isPlayerOffice(playerid, COORDINATOR))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Coordenador!");
+
+	new id, message[50];
+	
+	if(sscanf(params, "ds[50]", id, message))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /fakechat [id] [mensagem]");
+
+    SendClientMessageToAllEx(-1, "{%06x}%s(%d):{FFFFFF} %s", GetPlayerColor(id) >>> 8, message);
+    
+	return 1;
+}
+
+CMD:fakekick(playerid, params[])
+{
+    if(!isPlayerOffice(playerid, COORDINATOR))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Coordenador!");
+
+	new id, reason[30];
+	
+	if(sscanf(params, "ds[30]", id, reason))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /fakekick [id] [motivo]");
+	    
+	if(!IsPlayerConnected(id))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Jogador(a) nao conectado!");
+	    
+	if(isPlayerStaff(id))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce nao pode usar este comando com um staff!");
+	    
+	if(strlen(reason) > 30)
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Motivo muito extenso");
+	    
+	SendClientMessageToAllEx(COLOR_WARNING, "| ADMIN | O %s %s kickou o(a) jogador(a) %s, motivo: %s", getOfficePlayer(playerid), getPlayerName(playerid), getPlayerName(id), reason);
+	
+	return 1;
+}
+
+CMD:fakeban(playerid, params[])
+{
+    if(!isPlayerOffice(playerid, COORDINATOR))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Coordenador!");
+
+	new id, reason[30];
+
+	if(sscanf(params, "ds[30]", id, reason))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /fakeban [id] [motivo]");
+
+	if(!IsPlayerConnected(id))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Jogador(a) nao conectado!");
+
+	if(isPlayerStaff(id))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce nao pode usar este comando com um staff!");
+
+	if(strlen(reason) > 30)
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Motivo muito extenso");
+
+	SendClientMessageToAllEx(COLOR_WARNING, "| ADMIN | O %s %s baniu o(a) jogador(a) %s, motivo: %s", getOfficePlayer(playerid), getPlayerName(playerid), getPlayerName(id), reason);
+
+	return 1;
 }
 
 CMD:kickartodos(playerid)
