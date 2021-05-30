@@ -1639,13 +1639,13 @@ CMD:admins(playerid)
 {
 	new stringFormatted[250], totalAdmins = 0;
 	
-	for(new i = 0, players = GetPlayerPoolSize(); i < players; i ++)
+	for(new i = 0, players = GetPlayerPoolSize(); i <= players; i ++)
 	{
 	    if(isPlayerStaff(i))
 	    {
 	        totalAdmins ++;
 	        
-	        format(stringFormatted, sizeof(stringFormatted), "%s\n{cfd0d1}%s {fcfcfc}(Level Staff: {5be83f}%d{fcfcfc}) {fcfcfc}(Funcao: {5be83f}%s{fcfcfc})", stringFormatted, getPlayerName(i), playerInfo[i][p_LevelStaff], getOfficePlayer(i));
+	        format(stringFormatted, sizeof(stringFormatted), "%s\n{cfd0d1}%s {fcfcfc}(Level Staff: {5be83f}%d{fcfcfc}) {fcfcfc}(Funcao: {5be83f}%s{fcfcfc})\n\n", stringFormatted, getPlayerName(i), playerInfo[i][p_LevelStaff], getOfficePlayer(i));
 	    }
 	}
 
@@ -1811,7 +1811,11 @@ isPlayerOffice(playerid, office)
 
 getOfficePlayer(playerid)
 {
-	return s_nameOffice[ playerInfo[playerid][p_LevelStaff] ];
+	static office[12];
+	
+	format(office, sizeof(office), "%s", s_nameOffice[ playerInfo[playerid][p_LevelStaff] - 1 ]);
+	
+	return office;
 }
 
 getTotalPlayersOnline()
