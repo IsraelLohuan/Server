@@ -12,6 +12,7 @@
 #define DIALOG_OPTION_SPAWN 3
 #define DIALOG_ADMINS       4
 #define DIALOG_BANS         5
+#define DIALOG_COLORS       6
 
 // -- Defines Folders --
 
@@ -46,6 +47,8 @@ new __message[144];
 #define BAN_ACCOUNT  1
 #define BAN_IP       2
 
+#define Kick(%0) SetTimerEx("kickEx", 100, false, "i", %0)
+
 enum p_Info {
 	p_LevelStaff,
 	p_Password[50],
@@ -63,6 +66,7 @@ enum p_Info {
 
 enum s_Info {
 	s_TimerMessages,
+	bool:s_chatActived,
 	bool:s_Locked,
 	bool:s_AllFrozen
 }
@@ -87,14 +91,6 @@ enum a_colors
 	a_nameColor[40],
 	a_colorHex
 }
-
-static const s_nameOffice[][] = {
-	"Player",
-	"Helper",
-	"Coordenador",
-	"Gerente",
-	"Fundador"
-};
 
 static const Float: randomSpawn[][] = {
 	{ 1479.5145, -1674.2843, 14.0469, 180.5089 },
@@ -126,6 +122,7 @@ new server[s_Info];
 
 new survey[s_Survey];
 
+forward kickEx(playerid);
 forward verifyJailed(playerid);
 forward closedSurvey();
 forward messageRandom();
@@ -209,8 +206,19 @@ public OnVehicleDeath(vehicleid, killerid)
 public OnPlayerText(playerid, text[])
 {
 	if(playerInfo[playerid][p_ShutUp])
-	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce esta calado e nao pode falar no chat!");
+	{
+	    SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce esta calado e nao pode falar no chat!");
 	    
+	    return 0;
+	}
+	    
+	if(server[s_chatActived] && !isPlayerStaff(playerid))
+	{
+ 		SendClientMessage(playerid, COLOR_RED, "| ERRO | As mensagens via chat estao desativadas!");
+
+	    return 0;
+	}
+	
 	return 1;
 }
 
@@ -393,9 +401,9 @@ CMD:avisar(playerid, params[])
 	if(isPlayerStaff(id))
 		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce nao pode usar este comando com um staff!");
 
-	playerInfo[id][p_Notice] ++;
+	++ playerInfo[id][p_Notice];
 	
-	if(playerInfo[id][p_Notice] == 3)
+	if(playerInfo[id][p_Notice] >= 3)
 	{
 	    SendClientMessageEx(playerid, COLOR_GREY, "| INFO | O(a) jogador(a) %s cumpriu 3 avisos e foi kickado!", getPlayerName(id));
 	    SendClientMessageToAllEx(COLOR_MAIN, "| SERVER | O(a) jogador(a) %s cumpriu 3 avisos e foi kickado!", getPlayerName(id));
@@ -405,7 +413,7 @@ CMD:avisar(playerid, params[])
 	else
 	{
 	    SendClientMessageEx(playerid, COLOR_GREY, "| INFO | Voce setou +1 aviso para o jogador %s", getPlayerName(id));
-	    SendClientMessageEx(id, COLOR_GREY, "| INFO | O %s %s lhe setou 1 aviso, total: (%d/3). No ultimo aviso voce sera kickado!", getOfficePlayer(playerid), getPlayerName(playerid));
+	    SendClientMessageEx(id, COLOR_GREY, "| INFO | O %s %s lhe setou 1 aviso, total: (%d/3). No ultimo aviso voce sera kickado!", getOfficePlayer(playerid), getPlayerName(playerid), playerInfo[id][p_Notice]);
 	}
 	
 	return 1;
@@ -532,7 +540,7 @@ CMD:a(playerid, params[])
 
 	new messageFormatted[144];
 	
-	format(messageFormatted, sizeof(messageFormatted), "| CHAT-STAFF | O(a) %s %s[%d] diz: %s", getOfficePlayer(playerid), getPlayerName(playerid), params);
+	format(messageFormatted, sizeof(messageFormatted), "| CHAT-STAFF | O(a) %s %s[%d] diz: %s", getOfficePlayer(playerid), getPlayerName(playerid), playerid, params);
 	
     sendMessageStaff(messageFormatted);
     
@@ -565,6 +573,8 @@ CMD:congelar(playerid, params[])
 	if(isPlayerStaff(id))
 		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce nao pode usar este comando com um staff!");
 
+    playerInfo[id][p_Frozen] = true;
+    
     TogglePlayerControllable(id, false);
     
     SendClientMessageToAllEx(COLOR_MAIN, "| INFO | O %s %s congelou o(a) jogador(a) %s", getOfficePlayer(playerid), getPlayerName(playerid), getPlayerName(id));
@@ -588,7 +598,7 @@ CMD:descongelar(playerid, params[])
 	if(!playerInfo[id][p_Frozen])
     	return SendClientMessage(playerid, COLOR_RED, "| ERRO | Este jogador(a) nao esta congelado!");
 
-	TogglePlayerControllable(id, false);
+	TogglePlayerControllable(id, true);
 
  	SendClientMessageToAllEx(COLOR_MAIN, "| INFO | O %s %s descongelou o(a) jogador(a) %s", getOfficePlayer(playerid), getPlayerName(playerid), getPlayerName(id));
 
@@ -609,7 +619,7 @@ CMD:ir(playerid, params[])
 		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Jogador(a) nao conectado!");
 
 	SendClientMessageEx(playerid, COLOR_GREY, "| INFO | Voce foi ate o jogador %s", getPlayerName(id));
-	SendClientMessageEx(playerid, COLOR_MAIN, "| INFO | O(a) %s %s veio ate voce", getOfficePlayer(playerid), getPlayerName(playerid));
+	SendClientMessageEx(id, COLOR_MAIN, "| INFO | O(a) %s %s veio ate voce", getOfficePlayer(playerid), getPlayerName(playerid));
 	
 	new Float:posPlayer[3];
 	
@@ -633,7 +643,7 @@ CMD:trazer(playerid, params[])
 		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Jogador(a) nao conectado!");
 
 	SendClientMessageEx(playerid, COLOR_GREY, "| INFO | Voce trouxe o jogador %s", getPlayerName(id));
-	SendClientMessageEx(playerid, COLOR_MAIN, "| INFO | O(a) %s %s trouxe voce ate ele", getOfficePlayer(playerid), getPlayerName(playerid));
+	SendClientMessageEx(id, COLOR_MAIN, "| INFO | O(a) %s %s trouxe voce ate ele", getOfficePlayer(playerid), getPlayerName(playerid));
 
 	new Float:posPlayer[3];
 
@@ -878,6 +888,8 @@ CMD:invisivel(playerid)
 	if(playerInfo[playerid][p_invisible])
 	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce ja esta em modo invisivel!");
 	    
+    playerInfo[playerid][p_invisible] = true;
+    
     SetPlayerVirtualWorld(playerid, 5);
     
     SendClientMessage(playerid, COLOR_GREY, "| INFO | Voce esta em modo invisivel, para voltar digite: /visivel");
@@ -916,7 +928,9 @@ CMD:crashar(playerid, params[])
 	if(isPlayerStaff(id))
 		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce nao pode usar este comando com um staff!");
 
-	SendClientMessageToAllEx(COLOR_MAIN, "| INFO | O %s %s crashou o jogador %s, motivo: %s", getOfficePlayer(playerid), getPlayerName(playerid), getPlayerName(id), reason);
+	SendClientMessageEx(id, COLOR_MAIN, "| INFO | O %s %s crashou lhe deu crash, motivo: %s", getOfficePlayer(playerid), getPlayerName(playerid), reason);
+	
+	SendClientMessage(playerid, COLOR_GREY, MESSAGE_CMD_SUCESS);
 	
     GameTextForPlayer(id, "~k~~INVALID_KEY~", 5000, 5);
     
@@ -1059,7 +1073,7 @@ CMD:prender(playerid, params[])
 	
 	SendClientMessage(id, COLOR_GREEN, "| CADEIA | para ver o tempo restante digite: /cadeiatempo");
 	
-	setPlayerJailed(playerid, time);
+	setPlayerJailed(id, time);
 	
 	return 1;
 }
@@ -1121,7 +1135,7 @@ CMD:setarnome(playerid, params[])
 
 	new id, name[MAX_PLAYER_NAME];
 
-	if(sscanf(params, "dd", id, name))
+	if(sscanf(params, "ds[24]", id, name))
 	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /setarnome [id] [nome]");
 
     if(!IsPlayerConnected(id))
@@ -1144,6 +1158,23 @@ CMD:setarnome(playerid, params[])
 	return 1;
 }
 
+CMD:cores(playerid)
+{
+    if(!isPlayerOffice(playerid, COORDINATOR))
+		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Coordenador!");
+
+	new colorsMessage[144];
+	
+	for(new i = 0; i < sizeof(colors); i ++)
+	{
+	    format(colorsMessage, sizeof(colorsMessage), "%s\n%s", colorsMessage, colors[i][a_nameColor]);
+	}
+	
+	ShowPlayerDialog(playerid, DIALOG_COLORS, DIALOG_STYLE_MSGBOX, "Cores Disponiveis", colorsMessage, "Ok", "-");
+	
+	return 1;
+}
+
 CMD:setarcor(playerid, params[])
 {
     if(!isPlayerOffice(playerid, COORDINATOR))
@@ -1152,7 +1183,7 @@ CMD:setarcor(playerid, params[])
 	new id, color[40];
 	
 	if(sscanf(params, "ds[40]", id, color))
-	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /setarcor [id] [cor]");
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /setarcor [id] [cor] (para ver as cores disponiveis use: /cores)");
 	    
     if(!IsPlayerConnected(id))
 		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Jogador(a) nao conectado!");
@@ -1174,30 +1205,6 @@ CMD:setarcor(playerid, params[])
 	}
 	
 	SendClientMessage(playerid, COLOR_RED, "| ERRO | A cor escolhida e invalida!");
-	
-	return 1;
-}
-
-CMD:setarpos(playerid, params[])
-{
-	if(!isPlayerOffice(playerid, COORDINATOR))
-	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Coordenador!");
-
-	new id, Float:posSelected[3];
-	
-	if(sscanf(params, "diii", id, posSelected[0], posSelected[1], posSelected[2]))
-	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /setarpos [id] [posicao X] [posicao Y] [posicao Z]");
-	    
-	if(!IsPlayerConnected(id))
-	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Jogador(a) nao conectado!");
-
-    if(isPlayerStaff(id))
-		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce nao pode usar este comando com um staff!");
-
-	SetPlayerPos(id, posSelected[0], posSelected[1], posSelected[2]);
-	
-	SendClientMessageEx(playerid, COLOR_GREY, "| INFO | Voce levou o player %s para as coordenadas %d %d %d", getPlayerName(id), posSelected[0], posSelected[1], posSelected[2]);
-	SendClientMessageEx(id, COLOR_GREY, "| INFO | O %s %s alterou suas coordenadas", getOfficePlayer(playerid), getPlayerName(playerid));
 	
 	return 1;
 }
@@ -1250,7 +1257,7 @@ CMD:fakechat(playerid, params[])
 	if(sscanf(params, "ds[50]", id, message))
 	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /fakechat [id] [mensagem]");
 
-    SendClientMessageToAllEx(-1, "{%06x}%s(%d):{FFFFFF} %s", GetPlayerColor(id) >>> 8, message);
+    SendClientMessageToAllEx(GetPlayerColor(id), "%s(%d):{FFFFFF} %s", getPlayerName(id), id, message);
     
 	return 1;
 }
@@ -1442,7 +1449,10 @@ CMD:ativarmsgs(playerid)
 	if(!isPlayerOffice(playerid, MANAGER))
 		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Gerente!");
 		
-    server[s_TimerMessages] = SetTimer("messageRandom", Seconds(30), true);
+	if(server[s_chatActived])
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | O chat ja esta ativado!");
+	    
+    server[s_chatActived] = true;
     
     SendClientMessage(playerid, COLOR_GREY, "| INFO | Para desativar as mensagens digite: /desativarmsgs");
     
@@ -1454,7 +1464,10 @@ CMD:desativarmsgs(playerid)
 	if(!isPlayerOffice(playerid, MANAGER))
 		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Gerente!");
 
-    KillTimer(server[s_TimerMessages]);
+	if(server[s_chatActived] == false)
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | O chat nao esta ativado!");
+	    
+    server[s_chatActived] = false;
 
     SendClientMessage(playerid, COLOR_GREY, "| INFO | Para desativar as mensagens digite: /desativarmsgs");
 
@@ -1637,7 +1650,7 @@ CMD:reportar(playerid, params[])
 
 CMD:admins(playerid)
 {
-	new stringFormatted[250], totalAdmins = 0;
+	new stringFormatted[500], totalAdmins = 0;
 	
 	for(new i = 0, players = GetPlayerPoolSize(); i <= players; i ++)
 	{
@@ -1669,6 +1682,8 @@ CMD:sim(playerid)
 	if(playerInfo[playerid][p_isVotedInSurvey])
 		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce ja votou na enquete, aguarde o resultado!");
 
+    playerInfo[playerid][p_isVotedInSurvey] = true;
+    
 	survey[s_VoteYes] ++;
 	
 	SendClientMessage(playerid, COLOR_GREY, "| INFO | Seu voto foi computado com sucesso, aguarde o termino da enquete!");
@@ -1683,6 +1698,8 @@ CMD:nao(playerid)
 
     if(playerInfo[playerid][p_isVotedInSurvey])
 		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Voce ja votou na enquete, aguarde o resultado!");
+
+	playerInfo[playerid][p_isVotedInSurvey] = true;
 
 	survey[s_VoteNo] ++;
 
@@ -1702,6 +1719,11 @@ CMD:cadeiatempo(playerid)
 }
 
 // -- Callbacks --
+
+public kickEx(playerid)
+{
+	Kick(playerid);
+}
 
 public verifyJailed(playerid)
 {
@@ -1729,10 +1751,17 @@ public closedSurvey()
 	{
 	    SendClientMessageToAll(-1, "{cfd0d1}| ENQUETE | O {5be83f}SIM {fcfcfc}teve maior voto!");
 	}
-	else
+	else if(survey[s_VoteNo] > survey[s_VoteYes])
 	{
 	    SendClientMessageToAll(-1, "{cfd0d1}| ENQUETE | O {5be83f}NAO {fcfcfc}teve maior voto!");
 	}
+	else
+	{
+	    SendClientMessageToAll(-1, "{cfd0d1}| ENQUETE | A Enquete finalizou com empate!");
+	}
+	
+	survey[s_VoteYes] = 0;
+	survey[s_VoteNo] = 0;
 	
 	for(new i = 0, players = GetPlayerPoolSize(); i <= players; i ++)
 	{
@@ -1790,7 +1819,7 @@ destroyAllVehicles()
 
 sendMessageStaff(text[], color = COLOR_MAIN)
 {
-	for(new i = 0, players = GetPlayerPoolSize(); i < players; i ++)
+	for(new i = 0, players = GetPlayerPoolSize(); i <= players; i ++)
 	{
 	    if(isPlayerStaff(i))
 	    {
@@ -1813,7 +1842,14 @@ getOfficePlayer(playerid)
 {
 	static office[12];
 	
-	format(office, sizeof(office), "%s", s_nameOffice[ playerInfo[playerid][p_LevelStaff] - 1 ]);
+	switch(playerInfo[playerid][p_LevelStaff])
+	{
+	    case 1: format(office, sizeof(office), "%s", "Helper");
+		case 2: format(office, sizeof(office), "%s", "Moderador");
+		case 3: format(office, sizeof(office), "%s", "Coordenador");
+		case 4: format(office, sizeof(office), "%s", "Gerente");
+		case 5: format(office, sizeof(office), "%s", "Fundador");
+	}
 	
 	return office;
 }
@@ -1954,6 +1990,8 @@ setPlayerJailed(playerid, time)
 
 removePlayerFromJailed(playerid)
 {
+    SetPlayerInterior(playerid, 0);
+    
 	setPlayerRandomPos(playerid);
 	
 	SendClientMessage(playerid, COLOR_GREEN, "| CADEIA | Voce cumpriu sua pena e esta livre novamente!");
@@ -2159,7 +2197,7 @@ showDetailsBan(playerid, typeBan, folder[])
 	
 	ShowPlayerDialog(playerid, DIALOG_BANS, DIALOG_STYLE_MSGBOX, "Conta Banida", messageFormatted, "Ok", "-");
 	
-	Kick(playerid);
+	kickEx(playerid);
 }
 
 verifyTypeBanned(playerid, folder_Ban[])
