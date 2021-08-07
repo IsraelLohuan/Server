@@ -13,6 +13,7 @@
 #define DIALOG_ADMINS       4
 #define DIALOG_BANS         5
 #define DIALOG_COLORS       6
+#define DIALOG_COMMANDS     7
 
 // -- Defines Folders --
 
@@ -91,6 +92,68 @@ enum a_colors
 	a_nameColor[40],
 	a_colorHex
 }
+
+static const staffCommands[][] = {
+	{"Helper", "/avisar"},
+    {"Helper", "/kickar"},
+    {"Helper", "/tapa"},
+    {"Helper", "/assistir"},
+    {"Helper", "/passistir"},
+    {"Helper", "/texto"},
+    {"Helper", "/a"},
+    {"Helper", "/limparchat"},
+    {"Helper", "/congelar"},
+    {"Helper", "/descongelar"},
+    {"Helper", "/ir"},
+    {"Helper", "/trazer"},
+    {"Helper", "/destruircarros"},
+    {"Helper", "/calar"},
+    {"Helper", "/descalar"},
+    {"Helper", "/jetpack"},
+    {"Helper", "/moverplayer"},
+    {"Helper", "/godmode"},
+    {"Moderador", "/verip"},
+    {"Moderador", "/prender"},
+    {"Moderador", "/soltar"},
+    {"Moderador", "/ejetar"},
+    {"Moderador", "/setarscore"},
+    {"Moderador", "/setarvida"},
+    {"Moderador", "/setarcolete"},
+    {"Moderador", "/setarvida"},
+    {"Moderador", "/setarcolete"},
+    {"Moderador", "/banir"},
+    {"Moderador", "/desbanir"},
+    {"Moderador", "/enquete"},
+    {"Moderador", "/invisivel"},
+    {"Moderador", "/visivel"},
+    {"Moderador", "/crashar"},
+    {"Moderador", "/textoprivado"},
+    {"Coordenador", "/setarskin"},
+    {"Coordenador", "/setarnome"},
+    {"Coordenador", "/setarpos"},
+    {"Coordenador", "/setarcor"},
+    {"Coordenador", "/fakechat"},
+    {"Coordenador", "/fakekick"},
+    {"Coordenador", "/fakeban"},
+    {"Coordenador", "/force"},
+    {"Coordenador", "/verpos"},
+    {"Gerente", "/ativarmsgs"},
+    {"Gerente", "/desativarmsgs"},
+    {"Gerente", "/kickartodos"},
+    {"Gerente", "/congelartodos"},
+    {"Gerente", "/descongelartodos"},
+    {"Gerente", "/desarmartodos"},
+    {"Gerente", "/matartodos"},
+    {"Gerente", "/trazertodos"},
+    {"Gerente", "/crashartodos"},
+    {"Fundador", "/nomeserver"},
+    {"Fundador", "/nomegm"},
+    {"Fundador", "/nomelinguagem"},
+    {"Fundador", "/daradmin"},
+    {"Fundador", "/setargravidade"},
+    {"Fundador", "/trancarserver"},
+    {"Fundador", "/destrancarserver"}
+};
 
 static const Float: randomSpawn[][] = {
 	{ 1479.5145, -1674.2843, 14.0469, 180.5089 },
@@ -658,7 +721,7 @@ CMD:destruircarros(playerid)
     if(!isPlayerOffice(playerid, HELPER))
 		return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Staff!");
 
-	destroyAllVehicles();
+ 	destroyAllVehicles();
 	
 	SendClientMessageToAllEx(COLOR_MAIN, "| INFO | O %s %s deletou todos os veiculos nao ocupados!", getOfficePlayer(playerid), getPlayerName(playerid));
 	
@@ -1257,7 +1320,7 @@ CMD:fakechat(playerid, params[])
 	if(sscanf(params, "ds[50]", id, message))
 	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Use: /fakechat [id] [mensagem]");
 
-    SendClientMessageToAllEx(GetPlayerColor(id), "%s(%d):{FFFFFF} %s", getPlayerName(id), id, message);
+    SendClientMessageToAllEx(-1, "{%06x} %s(%d):{FFFFFF} %s", GetPlayerColor(playerid) >>> 8, getPlayerName(id), id, message);
     
 	return 1;
 }
@@ -1718,6 +1781,23 @@ CMD:cadeiatempo(playerid)
 	return 1;
 }
 
+CMD:comandosadm(playerid)
+{
+	if(!isPlayerStaff(playerid))
+	    return SendClientMessage(playerid, COLOR_RED, "| ERRO | Comando exclusivo para Staff!");
+
+	new stringFormatted[500];
+	
+	for(new i = 0; i < sizeof(staffCommands); i ++)
+	{
+ 		format(stringFormatted, sizeof(stringFormatted), "%s\n [Cargo: %s] %s", stringFormatted, staffCommands[i][0], staffCommands[i][1]);
+	}
+	
+	ShowPlayerDialog(playerid, DIALOG_COMMANDS, DIALOG_STYLE_MSGBOX, "Comandos Staff", stringFormatted, "Ok", "-");
+
+	return 1;
+}
+
 // -- Callbacks --
 
 public kickEx(playerid)
@@ -1808,7 +1888,7 @@ destroyAllVehicles()
             }
         }
 
-        if(!playerInVehicle)
+        if(playerInVehicle == false)
         {
             DestroyVehicle(v);
         }
@@ -1944,8 +2024,8 @@ createAccount(playerid, password[])
 
 	playerInfo[playerid][p_LevelStaff] = 0;
 	playerInfo[playerid][p_LastPosition][0] = randomSpawn[0][0];
-	playerInfo[playerid][p_LastPosition][1] = randomSpawn[0][0];
-	playerInfo[playerid][p_LastPosition][2] = randomSpawn[0][0];
+	playerInfo[playerid][p_LastPosition][1] = randomSpawn[0][1];
+	playerInfo[playerid][p_LastPosition][2] = randomSpawn[0][2];
 
 	GivePlayerMoney(playerid, 500);
 
